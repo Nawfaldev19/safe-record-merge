@@ -1,0 +1,18 @@
+# One command to run the production build: docker compose up --build
+services:
+  record_merge:
+    build: .
+    ports:
+      - '4100:4100'
+    environment:
+      PORT: 4100
+      PUBLIC_URL: http://localhost:4100
+      DATA_DIR: .data/pglite
+      SEED_DEMO: 'true'
+      LOG_LEVEL: info
+    volumes:
+      - record-merge-data:/app/.data
+    restart: unless-stopped
+
+volumes:
+  record-merge-data:
