@@ -1,0 +1,245 @@
+type Activity {
+  actorName: String
+  id: ID!
+  kind: String!
+  occurredAt: DateTime!
+  summary: String!
+}
+
+"""A moment in time as an ISO 8601 string in UTC."""
+scalar DateTime
+
+type DuplicatePair {
+  id: ID!
+  left: Member!
+  reasons: [String!]!
+  right: Member!
+
+  """0 to 1. Higher means more alike."""
+  score: Float!
+}
+
+type DuplicateReport {
+  comparisons: Int!
+  membersChecked: Int!
+  pairs: [DuplicatePair!]!
+}
+
+"""One person on the roster."""
+type Member {
+  activity: [Activity!]!
+  createdAt: DateTime!
+  duesPaidUntil: String
+  email: String
+  firstName: String!
+  id: ID!
+
+  """Whether the signed-in user has opened this record."""
+  isRead: Boolean!
+  lastName: String!
+  notes: String!
+  payments: [Payment!]!
+  phone: String
+  revision: Int!
+  signups: [TripSignup!]!
+  source: MemberSource!
+
+  """Derived from dues and trips, unless a stage was fixed by hand."""
+  stage: Stage!
+  stagePin: Stage
+  tripCount: Int!
+  updatedAt: DateTime!
+}
+
+input MemberInput {
+  email: String
+  firstName: String!
+  lastName: String!
+  notes: String
+  phone: String
+  source: MemberSource
+}
+
+"""The record behind an id, following any merges it has been through."""
+type MemberLookup {
+  member: Member!
+
+  """Set when the id asked for was merged into `member`."""
+  mergedFrom: Member
+}
+
+type MemberPage {
+  endCursor: String
+  hasNextPage: Boolean!
+  items: [Member!]!
+}
+
+enum MemberSort {
+  NAME
+  NEWEST
+}
+
+enum MemberSource {
+  EVENT
+  PAPER
+  WEB
+}
+
+type Membership {
+  role: Role!
+  workspace: WorkspaceSummary!
+}
+
+"""A journal entry for one merge."""
+type Merge {
+  absorbedId: ID!
+  absorbedName: String!
+  canUndo: Boolean!
+  id: ID!
+  mergedAt: DateTime!
+  mergedByName: String!
+  survivorId: ID!
+  survivorName: String!
+  undoBlockedBy: String
+  undoneAt: DateTime
+}
+
+input MergeInput {
+  """The record that is folded into the other."""
+  absorbedId: ID!
+  email: MergeSide!
+  expectedAbsorbedRevision: Int!
+  expectedSurvivorRevision: Int!
+  firstName: MergeSide!
+  lastName: MergeSide!
+  notes: NotesChoice!
+  phone: MergeSide!
+
+  """The record that is kept."""
+  survivorId: ID!
+}
+
+"""What merging two records would combine."""
+type MergePreview {
+  left: Member!
+  leftOnlyTrips: Int!
+  leftPayments: Int!
+  right: Member!
+  rightOnlyTrips: Int!
+  rightPayments: Int!
+  sharedTrips: Int!
+}
+
+type MergeResult {
+  mergeId: ID!
+  survivor: Member!
+}
+
+"""Which of the two records a value is taken from."""
+enum MergeSide {
+  ABSORBED
+  SURVIVOR
+}
+
+type Mutation {
+  createMember(input: MemberInput!, workspaceId: ID!): Member!
+
+  """
+  Marks two records as different people, so the pair is not suggested again.
+  """
+  dismissDuplicate(firstId: ID!, secondId: ID!, workspaceId: ID!): Boolean!
+  login(email: String!, password: String!): Viewer!
+  logout: Boolean!
+  markMemberRead(memberId: ID!, workspaceId: ID!): Boolean!
+  mergeMembers(input: MergeInput!, workspaceId: ID!): MergeResult!
+
+  """Organizers only. Pass null to let dues and trips decide again."""
+  setStagePin(memberId: ID!, pin: Stage, workspaceId: ID!): Member!
+
+  """Organizers only. Reverses a merge exactly, from its journal entry."""
+  undoMerge(mergeId: ID!, workspaceId: ID!): Merge!
+  updateMember(
+    """The revision the edit started from. A mismatch is a CONFLICT."""
+    expectedRevision: Int!
+    input: MemberInput!
+    memberId: ID!
+    workspaceId: ID!
+  ): Member!
+}
+
+enum NotesChoice {
+  ABSORBED
+  BOTH
+  SURVIVOR
+}
+
+type Payment {
+  amountCents: Int!
+  coversUntil: String!
+  id: ID!
+  paidOn: String!
+}
+
+type Query {
+  """The signed-in user, or null when nobody is signed in."""
+  viewer: Viewer
+
+  """A workspace the signed-in user belongs to."""
+  workspace(id: ID!): Workspace!
+}
+
+enum Role {
+  ORGANIZER
+  READER
+  VOLUNTEER
+}
+
+enum Stage {
+  ENQUIRY
+  LAPSED
+  MEMBER
+  TRIAL
+}
+
+type StageCount {
+  stage: Stage!
+  total: Int!
+  unread: Int!
+}
+
+type TripSignup {
+  attended: Boolean!
+
+  """A date as YYYY-MM-DD."""
+  happensOn: String!
+  id: ID!
+  tripTitle: String!
+}
+
+"""The signed-in user."""
+type Viewer {
+  email: String!
+  id: ID!
+  memberships: [Membership!]!
+  name: String!
+}
+
+"""One club. Everything below it belongs to this workspace only."""
+type Workspace {
+  duplicates: DuplicateReport!
+  id: ID!
+  member(id: ID!): MemberLookup!
+  members(after: String, first: Int, search: String, sort: MemberSort, stage: Stage): MemberPage!
+  mergePreview(leftId: ID!, rightId: ID!): MergePreview!
+  merges: [Merge!]!
+  name: String!
+
+  """The role of the signed-in user in this workspace."""
+  role: Role!
+  stageCounts: [StageCount!]!
+}
+
+type WorkspaceSummary {
+  id: ID!
+  name: String!
+}
